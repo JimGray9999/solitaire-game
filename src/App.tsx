@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  allSuits,
   Card,
   cardImageUrl,
   colorForSuit,
@@ -20,7 +19,7 @@ interface GameState {
   tableau: Column[];
   stock: Card[];
   waste: Card[];
-  foundations: Record<Suit, Card[]>;
+  foundations: Card[][]; // 4 piles, suit determined by first Ace placed
   score: number;
   moves: number;
   completionBonusAwarded: boolean;
@@ -41,11 +40,22 @@ const FLIP_BONUS = 5;
 const FOUNDATION_COMPLETE_BONUS = 50;
 const COMPLETION_BONUS = 500;
 
-const createFoundations = (): Record<Suit, Card[]> =>
-  allSuits.reduce((acc, suit) => {
-    acc[suit] = [];
-    return acc;
-  }, {} as Record<Suit, Card[]>);
+const createFoundations = (): Card[][] => [[], [], [], []];
+
+// Returns the foundation index that accepts this card, or -1 if none.
+const findFoundationIndex = (state: GameState, card: Card): number => {
+  // Prefer a pile already started with this suit
+  const existingIdx = state.foundations.findIndex(
+    (pile) => pile.length > 0 && pile[0].suit === card.suit && pile.length + 1 === card.rank
+  );
+  if (existingIdx !== -1) return existingIdx;
+  // An Ace can start any empty pile
+  if (card.rank === 1) {
+    const emptyIdx = state.foundations.findIndex((pile) => pile.length === 0);
+    return emptyIdx; // -1 if all full (shouldn't happen in a valid game)
+  }
+  return -1;
+};
 
 const dealTableau = (deck: Card[]): { tableau: Column[]; stock: Card[] } => {
   const tableau: Column[] = [];
@@ -141,18 +151,23 @@ const applyMoveToColumn = (
 const applyMoveToFoundation = (
   state: GameState,
   source: Selection,
-  suit: Suit
+  foundationIndex: number
 ): GameState | null => {
   const candidate = source.cards[0];
   if (source.cards.length !== 1) return null;
-  if (candidate.suit !== suit) return null;
-  const targetFoundation = state.foundations[suit];
-  if (candidate.rank !== targetFoundation.length + 1) return null;
 
-  const updatedFoundations = {
-    ...state.foundations,
-    [suit]: [...state.foundations[suit], { ...candidate, faceUp: true }]
-  };
+  const pile = state.foundations[foundationIndex];
+  if (pile.length === 0) {
+    // Only an Ace can start an empty foundation pile
+    if (candidate.rank !== 1) return null;
+  } else {
+    const top = pile[pile.length - 1];
+    if (candidate.suit !== top.suit || candidate.rank !== top.rank + 1) return null;
+  }
+
+  const updatedFoundations = state.foundations.map((p, i) =>
+    i === foundationIndex ? [...p, { ...candidate, faceUp: true }] : p
+  );
   let flipped = false;
   const updatedTableau = state.tableau.map((col, idx) => {
     if (source.source === "tableau" && idx === source.columnIndex) {
@@ -164,8 +179,8 @@ const applyMoveToFoundation = (
   });
   const updatedWaste = source.source === "waste" ? state.waste.slice(0, -1) : state.waste;
 
-  const foundationComplete = updatedFoundations[suit].length === 13;
-  const allComplete = allSuits.every((s) => updatedFoundations[s].length === 13);
+  const foundationComplete = updatedFoundations[foundationIndex].length === 13;
+  const allComplete = updatedFoundations.every((p) => p.length === 13);
   let scoreDelta = FOUNDATION_MOVE_SCORE + (flipped ? FLIP_BONUS : 0);
   if (foundationComplete) scoreDelta += FOUNDATION_COMPLETE_BONUS;
   if (allComplete && !state.completionBonusAwarded) scoreDelta += COMPLETION_BONUS;
@@ -194,7 +209,7 @@ const hasAnyMove = (state: GameState): boolean => {
       if (!card.faceUp) continue;
       const isTopCard = cardIdx === col.length - 1;
 
-      if (isTopCard && state.foundations[card.suit].length + 1 === card.rank) return true;
+      if (isTopCard && findFoundationIndex(state, card) !== -1) return true;
 
       for (let targetCol = 0; targetCol < state.tableau.length; targetCol++) {
         if (targetCol === sourceCol) continue;
@@ -214,7 +229,7 @@ const hasAnyMove = (state: GameState): boolean => {
   }
 
   if (wasteTop) {
-    if (state.foundations[wasteTop.suit].length + 1 === wasteTop.rank) return true;
+    if (findFoundationIndex(state, wasteTop) !== -1) return true;
     for (let targetCol = 0; targetCol < state.tableau.length; targetCol++) {
       const target = state.tableau[targetCol];
       if (target.length === 0 && wasteTop.rank === 13) return true;
@@ -397,34 +412,38 @@ const App = (): JSX.Element => {
     const timer = setTimeout(() => {
       // Find the lowest-ranked card that can go to a foundation (waste first, then tableau)
       let bestSource: Selection | null = null;
-      let bestSuit: Suit | null = null;
+      let bestFoundationIdx = -1;
       let bestRank = Infinity;
 
       const wasteTop = game.waste[game.waste.length - 1];
-      if (wasteTop && game.foundations[wasteTop.suit].length + 1 === wasteTop.rank) {
-        bestSource = { source: "waste", cards: [wasteTop] };
-        bestSuit = wasteTop.suit;
-        bestRank = wasteTop.rank;
+      if (wasteTop) {
+        const idx = findFoundationIndex(game, wasteTop);
+        if (idx !== -1) {
+          bestSource = { source: "waste", cards: [wasteTop] };
+          bestFoundationIdx = idx;
+          bestRank = wasteTop.rank;
+        }
       }
 
       game.tableau.forEach((col, i) => {
         const top = col[col.length - 1];
-        if (top && top.faceUp && game.foundations[top.suit].length + 1 === top.rank) {
-          if (top.rank < bestRank) {
+        if (top && top.faceUp) {
+          const idx = findFoundationIndex(game, top);
+          if (idx !== -1 && top.rank < bestRank) {
             bestSource = {
               source: "tableau",
               columnIndex: i,
               cardIndex: col.length - 1,
               cards: [top]
             };
-            bestSuit = top.suit;
+            bestFoundationIdx = idx;
             bestRank = top.rank;
           }
         }
       });
 
-      if (bestSource && bestSuit) {
-        const next = applyMoveToFoundation(game, bestSource, bestSuit);
+      if (bestSource && bestFoundationIdx !== -1) {
+        const next = applyMoveToFoundation(game, bestSource, bestFoundationIdx);
         if (next) {
           if (next.completed) {
             setGame({ ...next, score: next.score + 1000 });
@@ -467,8 +486,8 @@ const App = (): JSX.Element => {
         setStatusMessage("Moved cards.");
       }
     } else if (foundEl) {
-      const suit = foundEl.dataset.dropFoundation as Suit;
-      const next = applyMoveToFoundation(game, meta.source, suit);
+      const foundationIndex = parseInt(foundEl.dataset.dropFoundation!);
+      const next = applyMoveToFoundation(game, meta.source, foundationIndex);
       if (next) {
         setGameHistory((h) => [...h, game]);
         setGame(next);
@@ -674,7 +693,9 @@ const App = (): JSX.Element => {
   const handleCardDoubleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>, card: Card, source: Selection) => {
       e.stopPropagation();
-      const next = applyMoveToFoundation(game, source, card.suit);
+      const idx = findFoundationIndex(game, card);
+      if (idx === -1) return;
+      const next = applyMoveToFoundation(game, source, idx);
       if (next) {
         setGameHistory((h) => [...h, game]);
         setGame(next);
@@ -686,7 +707,7 @@ const App = (): JSX.Element => {
   );
 
   const handleFoundationClick = useCallback(
-    (suit: Suit) => {
+    (foundationIndex: number) => {
       if (dragMetaRef.current?.started) return;
       const wasteTop = game.waste[game.waste.length - 1];
       const source: Selection | null =
@@ -695,17 +716,18 @@ const App = (): JSX.Element => {
         setStatusMessage("No card available to move to foundations.");
         return;
       }
-      const next = applyMoveToFoundation(game, source, suit);
+      const next = applyMoveToFoundation(game, source, foundationIndex);
       if (next) {
         setGameHistory((h) => [...h, game]);
         setGame(next);
         setStatusMessage("Card added to the foundation.");
       } else {
         const candidate = source.cards[0];
-        if (candidate.suit !== suit)
-          setStatusMessage("Choose the foundation that matches the card's suit.");
-        else if (source.source === "tableau" && source.cards.length !== 1)
+        const pile = game.foundations[foundationIndex];
+        if (source.source === "tableau" && source.cards.length !== 1)
           setStatusMessage("Only single cards can move to a foundation.");
+        else if (pile.length > 0 && candidate.suit !== pile[0].suit)
+          setStatusMessage("That card doesn't match this foundation's suit.");
         else setStatusMessage("Cards must stack from Ace onward.");
       }
       setSelection(null);
@@ -1023,7 +1045,12 @@ const App = (): JSX.Element => {
             </button>
             <button
               type="button"
-              onClick={() => handleFoundationClick(selectedCard?.suit ?? "spades")}
+              onClick={() => {
+                const card = selectedCard ?? game.waste[game.waste.length - 1];
+                if (!card) return;
+                const idx = findFoundationIndex(game, card);
+                if (idx !== -1) handleFoundationClick(idx);
+              }}
               disabled={!selectedCard}
             >
               Move to foundation
@@ -1098,15 +1125,14 @@ const App = (): JSX.Element => {
             <p>Discard Pile</p>
           </div>
 
-          {allSuits.map((suit) => {
-            const foundation = game.foundations[suit];
-            const top = foundation[foundation.length - 1];
+          {game.foundations.map((pile, foundationIndex) => {
+            const top = pile[pile.length - 1];
             return (
               <div
-                key={suit}
+                key={foundationIndex}
                 className="pile"
-                data-drop-foundation={suit}
-                onClick={() => handleFoundationClick(suit)}
+                data-drop-foundation={foundationIndex}
+                onClick={() => handleFoundationClick(foundationIndex)}
                 role="button"
                 tabIndex={0}
               >
@@ -1119,9 +1145,8 @@ const App = (): JSX.Element => {
                     />
                   </div>
                 ) : (
-                  <div className="card card-empty">{suit.charAt(0).toUpperCase()}</div>
+                  <div className="card card-empty">A</div>
                 )}
-                <p>{suit}</p>
               </div>
             );
           })}
