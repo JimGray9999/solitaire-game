@@ -261,6 +261,33 @@ interface DragMeta {
   started: boolean;
 }
 
+// ── Keyboard navigation ───────────────────────────────────────────────────────
+
+type KeyboardPos =
+  | { area: "stock" }
+  | { area: "discard" }
+  | { area: "foundation"; index: number }
+  | { area: "tableau"; columnIndex: number; cardIndex: number };
+
+// Returns the lowest face-up card index in a column (entry point for keyboard nav)
+const firstFaceUpIdx = (col: Column): number => {
+  const i = col.findIndex((c) => c.faceUp);
+  return i === -1 ? Math.max(0, col.length - 1) : i;
+};
+
+// Top-row slot indices: stock=0, discard=1, foundation[0..3]=2..5
+const kbTopIdx = (pos: KeyboardPos): number => {
+  if (pos.area === "stock") return 0;
+  if (pos.area === "discard") return 1;
+  if (pos.area === "foundation") return 2 + pos.index;
+  return 0;
+};
+const kbPosForTopIdx = (i: number): KeyboardPos => {
+  if (i <= 0) return { area: "stock" };
+  if (i === 1) return { area: "discard" };
+  return { area: "foundation", index: Math.min(i - 2, 3) };
+};
+
 // ── Card back catalogue ───────────────────────────────────────────────────────
 
 const CARD_BACK_DESIGNS = [
@@ -342,6 +369,11 @@ const App = (): JSX.Element => {
   // executeDropRef is updated every render so the window pointerup handler
   // always gets a closure with fresh `game` state.
   const executeDropRef = useRef<(x: number, y: number) => void>(() => {});
+
+  // Keyboard focus position (null = keyboard nav inactive)
+  const [keyboardFocus, setKeyboardFocus] = useState<KeyboardPos | null>(null);
+  // handleKeyRef updated every render (same pattern as executeDropRef)
+  const handleKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
 
   useEffect(() => {
     localStorage.setItem("solitaire-player", playerName);
@@ -499,6 +531,135 @@ const App = (): JSX.Element => {
     cancelDrag();
   };
 
+  // Updated every render — always reads fresh state and latest handler callbacks.
+  handleKeyRef.current = (e: KeyboardEvent) => {
+    // Never intercept while user is typing in an input/textarea
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+    const anyModalOpen =
+      showResignModal || showPlayAgainModal || showSettings || showAutoCompleteModal;
+    const key = e.key;
+    const upper = key.toUpperCase();
+
+    // Escape always clears selection + focus (works even when modals open)
+    if (key === "Escape") {
+      setSelection(null);
+      setKeyboardFocus(null);
+      return;
+    }
+
+    // Don't handle game shortcuts while a modal is blocking the board
+    if (anyModalOpen) return;
+
+    // ── Single-key shortcuts ──────────────────────────────────────────────────
+    if (upper === "D") {
+      e.preventDefault();
+      if (!resigned && !game.completed) handleStockClick();
+      return;
+    }
+    if (upper === "U") {
+      e.preventDefault();
+      handleUndo();
+      return;
+    }
+    if (upper === "R") {
+      e.preventDefault();
+      if (!resigned && !game.completed) handleResign();
+      return;
+    }
+
+    // ── Enter / Space — activate focused position ─────────────────────────────
+    if (key === "Enter" || key === " ") {
+      e.preventDefault();
+      const focus = keyboardFocus;
+      if (!focus) {
+        setKeyboardFocus({ area: "stock" });
+        return;
+      }
+      if (focus.area === "stock") {
+        handleStockClick();
+      } else if (focus.area === "discard") {
+        selectWaste();
+      } else if (focus.area === "foundation") {
+        handleFoundationClick(focus.index);
+      } else {
+        // Tableau — if selection exists try to place it, otherwise select the card
+        const col = game.tableau[focus.columnIndex];
+        const card = col[focus.cardIndex];
+        if (selection) {
+          handleColumnClick(focus.columnIndex);
+        } else if (card?.faceUp) {
+          selectTableau(focus.columnIndex, focus.cardIndex);
+        } else {
+          handleColumnClick(focus.columnIndex); // flips top face-down card
+        }
+      }
+      return;
+    }
+
+    // ── Arrow navigation ──────────────────────────────────────────────────────
+    if (!key.startsWith("Arrow")) return;
+    e.preventDefault();
+
+    const focus = keyboardFocus;
+    if (!focus) {
+      setKeyboardFocus({ area: "stock" });
+      return;
+    }
+
+    if (focus.area !== "tableau") {
+      // Top row: stock(0) discard(1) foundation[0..3](2..5)
+      const rowIdx = kbTopIdx(focus);
+      if (key === "ArrowLeft") {
+        setKeyboardFocus(kbPosForTopIdx(Math.max(0, rowIdx - 1)));
+      } else if (key === "ArrowRight") {
+        setKeyboardFocus(kbPosForTopIdx(Math.min(5, rowIdx + 1)));
+      } else if (key === "ArrowDown") {
+        const colIdx = Math.min(rowIdx, 6);
+        const col = game.tableau[colIdx];
+        setKeyboardFocus({
+          area: "tableau",
+          columnIndex: colIdx,
+          cardIndex: col.length > 0 ? firstFaceUpIdx(col) : 0
+        });
+      }
+      // ArrowUp from top row: no-op
+    } else {
+      // Tableau row
+      const col = game.tableau[focus.columnIndex];
+      const faceStart = col.length > 0 ? firstFaceUpIdx(col) : 0;
+
+      if (key === "ArrowLeft") {
+        const newCol = Math.max(0, focus.columnIndex - 1);
+        const newColData = game.tableau[newCol];
+        setKeyboardFocus({
+          area: "tableau",
+          columnIndex: newCol,
+          cardIndex: newColData.length > 0 ? firstFaceUpIdx(newColData) : 0
+        });
+      } else if (key === "ArrowRight") {
+        const newCol = Math.min(6, focus.columnIndex + 1);
+        const newColData = game.tableau[newCol];
+        setKeyboardFocus({
+          area: "tableau",
+          columnIndex: newCol,
+          cardIndex: newColData.length > 0 ? firstFaceUpIdx(newColData) : 0
+        });
+      } else if (key === "ArrowDown") {
+        if (col.length > 0 && focus.cardIndex < col.length - 1) {
+          setKeyboardFocus({ ...focus, cardIndex: focus.cardIndex + 1 });
+        }
+      } else if (key === "ArrowUp") {
+        if (focus.cardIndex > faceStart) {
+          setKeyboardFocus({ ...focus, cardIndex: focus.cardIndex - 1 });
+        } else {
+          // Bubble up to top row
+          setKeyboardFocus(kbPosForTopIdx(Math.min(focus.columnIndex, 5)));
+        }
+      }
+    }
+  };
+
   // Window listeners registered once — use refs for fresh state, no re-registration.
   useEffect(() => {
     const onPointerMove = (e: PointerEvent) => {
@@ -536,11 +697,15 @@ const App = (): JSX.Element => {
       }
     };
 
+    const onKeyDown = (e: KeyboardEvent) => handleKeyRef.current(e);
+
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("keydown", onKeyDown);
     };
   }, []); // empty — stale closure avoided entirely via refs
 
@@ -559,6 +724,7 @@ const App = (): JSX.Element => {
     setShowSettings(false);
     setShowRestartConfirm(false);
     setSelection(null);
+    setKeyboardFocus(null);
     setTimerKey((prev) => prev + 1);
     setStatusMessage("");
     setScreen("game");
@@ -1072,7 +1238,7 @@ const App = (): JSX.Element => {
 
       <div className={`game-board${isAutoCompleting ? " is-autocompleting" : ""}`}>
         <div className="piles">
-          <div className="pile" onClick={handleStockClick} role="button" tabIndex={0}>
+          <div className={`pile${keyboardFocus?.area === "stock" ? " keyboard-focused" : ""}`} onClick={handleStockClick} role="button" tabIndex={0}>
             {game.stock.length ? (
               <div className="card face-down">
                 <img src={cardBackUrl(cardBack)} alt="Card back" draggable={false} />
@@ -1083,7 +1249,7 @@ const App = (): JSX.Element => {
             <p>Deck ({game.stock.length})</p>
           </div>
 
-          <div className="pile" role="button" tabIndex={0} onClick={selectWaste}>
+          <div className={`pile${keyboardFocus?.area === "discard" ? " keyboard-focused" : ""}`} role="button" tabIndex={0} onClick={selectWaste}>
             {game.waste.length
               ? (() => {
                   const top = game.waste[game.waste.length - 1];
@@ -1118,7 +1284,7 @@ const App = (): JSX.Element => {
             return (
               <div
                 key={foundationIndex}
-                className="pile"
+                className={`pile${keyboardFocus?.area === "foundation" && keyboardFocus.index === foundationIndex ? " keyboard-focused" : ""}`}
                 data-drop-foundation={foundationIndex}
                 onClick={() => handleFoundationClick(foundationIndex)}
                 role="button"
@@ -1163,7 +1329,12 @@ const App = (): JSX.Element => {
                       selection.cardIndex <= cardIndex
                         ? "selected"
                         : "",
-                      dragSourceIds?.has(card.id) ? "is-dragging" : ""
+                      dragSourceIds?.has(card.id) ? "is-dragging" : "",
+                      keyboardFocus?.area === "tableau" &&
+                      keyboardFocus.columnIndex === columnIndex &&
+                      keyboardFocus.cardIndex === cardIndex
+                        ? "keyboard-focused"
+                        : ""
                     ]
                       .filter(Boolean)
                       .join(" ")}
