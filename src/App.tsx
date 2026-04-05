@@ -1,5 +1,4 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Analytics } from "@vercel/analytics/react"
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   allSuits,
   Card,
@@ -302,7 +301,9 @@ const App = (): JSX.Element => {
   const [isAutoCompleting, setIsAutoCompleting] = useState(false);
   const autoCompleteShownRef = useRef(false);
   const [scoreSubmitted, setScoreSubmitted] = useState(false);
+  const [showResignModal, setShowResignModal] = useState(false);
   const [showPlayAgainModal, setShowPlayAgainModal] = useState(false);
+  const endGameShownRef = useRef(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
   const [cardBack, setCardBack] = useState<string>(
@@ -377,6 +378,17 @@ const App = (): JSX.Element => {
       autoCompleteShownRef.current = false;
     }
   }, [isAutoCompleteAvailable]);
+
+  // Show the win/play-again modal once when the game is completed
+  useEffect(() => {
+    if (game.completed && !endGameShownRef.current) {
+      endGameShownRef.current = true;
+      setShowPlayAgainModal(true);
+    }
+    if (!game.completed) {
+      endGameShownRef.current = false;
+    }
+  }, [game.completed]);
 
   // Animation loop: move one card to its foundation every 80 ms
   useEffect(() => {
@@ -522,7 +534,9 @@ const App = (): JSX.Element => {
     setIsAutoCompleting(false);
     autoCompleteShownRef.current = false;
     setScoreSubmitted(false);
+    setShowResignModal(false);
     setShowPlayAgainModal(false);
+    endGameShownRef.current = false;
     setShowSettings(false);
     setShowRestartConfirm(false);
     setSelection(null);
@@ -709,19 +723,28 @@ const App = (): JSX.Element => {
   }, [gameHistory]);
 
   const handleResign = useCallback(() => {
+    setShowResignModal(true);
+  }, []);
+
+  const handleResignConfirm = useCallback(async (withSubmit: boolean) => {
+    setShowResignModal(false);
     setResigned(true);
     setSelection(null);
     cancelDrag();
-  }, [cancelDrag]);
+    if (withSubmit && playerName.trim() && !scoreSubmitted) {
+      await submitScore(false);
+    }
+    setShowPlayAgainModal(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cancelDrag, playerName, scoreSubmitted, game.score]);
 
-  const handleHighScoreSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!playerName.trim() || !game.completed || scoreSubmitted) return;
+  async function submitScore(isCompleted: boolean) {
+    if (!playerName.trim() || scoreSubmitted) return;
     try {
       const payload = {
         player: playerName.trim(),
         score: game.score,
-        completed: game.completed ? 1 : 0
+        completed: isCompleted ? 1 : 0
       };
       const res = await fetch("/api/highscores", {
         method: "POST",
@@ -730,16 +753,14 @@ const App = (): JSX.Element => {
       });
       if (!res.ok) throw new Error("Unable to submit score.");
       const created = (await res.json()) as HighScoreEntry;
-      setHighscores((prev) => [created, ...prev].slice(0, 25));
+      setHighscores((prev) => [created, ...prev].slice(0, 10));
       setScoreSubmitted(true);
       setPlayerName("");
-      setShowPlayAgainModal(true);
-      setStatusMessage("");
     } catch (error) {
       console.error(error);
       setStatusMessage("Failed to submit score.");
     }
-  };
+  }
 
   // ── Title screen ───────────────────────────────────────────────────────────
   if (screen === "title") {
@@ -756,8 +777,6 @@ const App = (): JSX.Element => {
     game.stock.length === 0 &&
     game.waste.length === 0 &&
     !hasAnyMove(game);
-
-  const canSubmitScore = game.completed;
 
   // Initial ghost position (subsequent moves use direct DOM transform)
   const ghostInitTransform =
@@ -797,31 +816,81 @@ const App = (): JSX.Element => {
         </div>
       )}
 
-      {/* Play-again modal — shown after score submission */}
+      {/* Resign confirmation modal */}
+      {showResignModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal">
+            <h2>Resign game?</h2>
+            <p>You're about to end this game with <strong>{game.score} pts</strong>.</p>
+            <p className="modal-bonus">Submit your score before leaving?</p>
+            <div className="modal-name-input">
+              <input
+                aria-label="Player name"
+                placeholder="Your name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="modal-buttons modal-buttons-col">
+              <button
+                type="button"
+                disabled={!playerName.trim()}
+                onClick={() => handleResignConfirm(true)}
+              >
+                Resign &amp; submit score
+              </button>
+              <button type="button" onClick={() => handleResignConfirm(false)}>
+                Resign without submitting
+              </button>
+              <button type="button" className="modal-btn-ghost" onClick={() => setShowResignModal(false)}>
+                Cancel — keep playing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Win / end-of-game modal — shown when game.completed, includes score submission */}
       {showPlayAgainModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal">
-            <h2>Score Submitted!</h2>
-            <p>Your score has been saved to the leaderboard.</p>
-            <p className="modal-bonus">Would you like to play again?</p>
+            <h2>{game.completed ? "You won! 🎉" : "Game over"}</h2>
+            <p>Final score: <strong>{game.score} pts</strong></p>
+
+            {scoreSubmitted ? (
+              <p className="modal-bonus">Score submitted ✓</p>
+            ) : (
+              <>
+                <p className="modal-bonus">Submit your score to the leaderboard:</p>
+                <div className="modal-name-input">
+                  <input
+                    aria-label="Player name"
+                    placeholder="Your name"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div style={{ marginBottom: "0.75rem" }}>
+                  <button
+                    type="button"
+                    className="modal-submit-btn"
+                    disabled={!playerName.trim()}
+                    onClick={() => submitScore(game.completed)}
+                  >
+                    Submit score
+                  </button>
+                </div>
+              </>
+            )}
+
             <div className="modal-buttons">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPlayAgainModal(false);
-                  handleRestart();
-                }}
-              >
-                Yes, play again!
+              <button type="button" onClick={() => { setShowPlayAgainModal(false); handleRestart(); }}>
+                Play again
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPlayAgainModal(false);
-                  setScreen("title");
-                }}
-              >
-                No, return to menu
+              <button type="button" onClick={() => { setShowPlayAgainModal(false); setScreen("title"); }}>
+                Return to menu
               </button>
             </div>
           </div>
@@ -1134,21 +1203,6 @@ const App = (): JSX.Element => {
 
       <div className="highscore-list">
         <div className="panel">
-          <h2>Submit Score</h2>
-          <form onSubmit={handleHighScoreSubmit}>
-            <input
-              aria-label="Player name"
-              placeholder="Player name"
-              value={playerName}
-              onChange={(event) => setPlayerName(event.target.value)}
-            />
-            <button type="submit" disabled={!playerName.trim() || !canSubmitScore || scoreSubmitted}>
-              {scoreSubmitted ? "Submitted ✓" : `Submit ${game.score} pts`}
-            </button>
-          </form>
-          {isGameComplete && <p>Great! Submit your winning score.</p>}
-        </div>
-        <div className="panel">
           <h2>Leaderboard</h2>
           {highscores.filter((e) => e.completed).length === 0 ? (
             <p>No entries yet.</p>
@@ -1168,7 +1222,6 @@ const App = (): JSX.Element => {
       </div>
     </div>
   );
-  <Analytics />;
 };
 
 export default App;

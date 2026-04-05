@@ -339,6 +339,71 @@ body {
   background: rgba(255, 255, 255, 0.16);
 }
 
+/* Name input inside modals */
+.modal-name-input {
+  margin: 0.75rem 0;
+}
+
+.modal-name-input input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.85rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.modal-name-input input:focus {
+  border-color: rgba(254, 205, 50, 0.5);
+}
+
+/* Submit button inside modal (full-width accent) */
+.modal-submit-btn {
+  width: 100%;
+  border: none;
+  background: var(--accent);
+  color: #0b2b19;
+  padding: 0.55rem;
+  border-radius: 999px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.modal-submit-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Stacked modal buttons (resign modal) */
+.modal-buttons-col {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.modal-buttons-col button {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Ghost / tertiary button style */
+.modal-btn-ghost {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  font-weight: normal !important;
+  font-size: 0.82rem !important;
+  box-shadow: none !important;
+}
+
+.modal-btn-ghost:hover {
+  color: var(--text) !important;
+  transform: none !important;
+}
+
 /* Disable interaction with the board during animation */
 .game-board.is-autocompleting {
   pointer-events: none;
