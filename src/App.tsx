@@ -1093,9 +1093,9 @@ const App = (): JSX.Element => {
                   );
                 })()
               : (
-                <div className="card card-empty">Waste</div>
+                <div className="card card-empty">Discard</div>
               )}
-            <p>Waste</p>
+            <p>Discard Pile</p>
           </div>
 
           {allSuits.map((suit) => {
