@@ -10,25 +10,29 @@ This project is an experiment in how far you can go building a complete, polishe
 
 ### Tools used
 
-| Role | Tool |
-|---|---|
-| IDE | [Cursor](https://www.cursor.com) |
-| LLM | [Claude Code](https://claude.ai/code) |
-| Deployment | [Vercel](https://vercel.com) |
+
+| Role       | Tool                                  |
+| ---------- | ------------------------------------- |
+| IDE        | [Cursor](https://www.cursor.com)      |
+| LLM        | [Claude Code](https://claude.ai/code) |
+| Deployment | [Vercel](https://vercel.com)          |
+
 
 ---
 
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 18 + TypeScript |
-| Build tool | Vite 8 |
-| Styling | Plain CSS (CSS custom properties) |
-| Backend (local) | Express 4 (Node.js) |
-| Backend (production) | Vercel Serverless Functions |
-| Score storage | JSON file (`server/highscores.json`) |
-| Card assets | SVG — [SVG-cards](https://github.com/htdebeer/SVG-cards) card faces, custom card backs |
+
+| Layer                | Technology                                                                             |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| Frontend             | React 18 + TypeScript                                                                  |
+| Build tool           | Vite 8                                                                                 |
+| Styling              | Plain CSS (CSS custom properties)                                                      |
+| Backend (local)      | Express 4 (Node.js)                                                                    |
+| Backend (production) | Vercel Serverless Functions                                                            |
+| Score storage        | JSON file (`server/highscores.json`)                                                   |
+| Card assets          | SVG — [SVG-cards](https://github.com/htdebeer/SVG-cards) card faces, custom card backs |
+
 
 ---
 
@@ -42,7 +46,7 @@ solitaire-game/
 │   └── cards/
 │       ├── *.svg              # 52 card face SVGs
 │       └── backs/
-│           └── *.svg          # 15 card back SVGs (3 designs × 5 colours)
+│           └── *.svg          # 15 card back SVGs (3 designs × 5 colors)
 ├── server/
 │   ├── index.js               # Express API server (local development)
 │   └── highscores.json        # Persistent score storage (top 10)
@@ -84,10 +88,12 @@ npm start
 
 This runs two processes concurrently:
 
-| Process | Command | URL |
-|---|---|---|
-| Vite frontend | `npm run dev` | http://127.0.0.1:5173 |
-| Express API | `npm run serve-api` | http://127.0.0.1:5050 |
+
+| Process       | Command             | URL                                            |
+| ------------- | ------------------- | ---------------------------------------------- |
+| Vite frontend | `npm run dev`       | [http://127.0.0.1:5173](http://127.0.0.1:5173) |
+| Express API   | `npm run serve-api` | [http://127.0.0.1:5050](http://127.0.0.1:5050) |
+
 
 Vite proxies all `/api/*` requests to the Express server automatically, so the frontend and API work together on a single origin during development.
 
@@ -119,7 +125,8 @@ Output goes to `dist/`. Vercel runs this automatically on every push to `main`.
 - Auto-complete modal when all cards are face-up (+1 000 bonus)
 - Resign option when no moves remain
 - Stuck-game detection with banner prompt
-- Settings panel: card back picker (3 designs × 5 colours), restart with confirmation
+- Settings panel: card back picker (3 designs × 5 colors), restart with confirmation
 - Persistent high-score leaderboard (top 10 stored, top 5 displayed)
 - Timer, move counter, and live score
 - Title screen and post-game play-again flow
+
