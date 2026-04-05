@@ -1,0 +1,44 @@
+[
+  {
+    "id": 5,
+    "player": "Jim",
+    "score": 2550,
+    "completed": true,
+    "earned_at": "2026-04-05T02:54:14.843Z"
+  },
+  {
+    "id": 4,
+    "player": "Jim",
+    "score": 2545,
+    "completed": true,
+    "earned_at": "2026-04-05T02:42:56.206Z"
+  },
+  {
+    "id": 3,
+    "player": "Jim",
+    "score": 2545,
+    "completed": true,
+    "earned_at": "2026-04-05T02:42:53.445Z"
+  },
+  {
+    "id": 6,
+    "player": "Jim",
+    "score": 2530,
+    "completed": true,
+    "earned_at": "2026-04-05T03:13:46.236Z"
+  },
+  {
+    "id": 1,
+    "player": "Alex",
+    "score": 1230,
+    "completed": true,
+    "earned_at": "2026-04-03T22:10:00Z"
+  },
+  {
+    "id": 2,
+    "player": "Jim",
+    "score": 380,
+    "completed": true,
+    "earned_at": "2026-04-05T01:47:30.713Z"
+  }
+]
