@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Analytics } from "@vercel/analytics/react"
 import {
   allSuits,
   Card,
@@ -1167,6 +1168,7 @@ const App = (): JSX.Element => {
       </div>
     </div>
   );
+  <Analytics />;
 };
 
 export default App;
