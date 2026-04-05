@@ -930,20 +930,22 @@ const App = (): JSX.Element => {
 
       <div className="game-area">
       <div className="hud">
-        <div className="panel">
+        <div className="panel score-panel">
           <h2>Score</h2>
-          <div>Points: {game.score}</div>
-          <div>Moves: {game.moves}</div>
-          <div>Time: {formatTime(seconds)}</div>
+          <div className="score-row">
+            <div>Points: {game.score}</div>
+            <div>Moves: {game.moves}</div>
+            <div>Time: {formatTime(seconds)}</div>
+          </div>
           {isGameComplete && <div>Game complete! +500 bonus applied.</div>}
           {resigned && !isGameComplete && <div>Game resigned.</div>}
         </div>
-        <div className="panel">
+        <div className="panel selection-panel">
           <h2>Selection</h2>
           <div>
             {selectedCard
               ? `${rankLabel(selectedCard.rank)} of ${selectedCard.suit}`
-              : "Tap a card to move it."}
+              : <span className="selection-hint">Tap a card to move it.</span>}
           </div>
           <div className="controls">
             <button type="button" onClick={handleStockClick}>
