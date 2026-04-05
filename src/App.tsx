@@ -1043,18 +1043,6 @@ const App = (): JSX.Element => {
             <button type="button" onClick={handleStockClick}>
               {game.stock.length ? "Draw card" : "Reset stock"}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                const card = selectedCard ?? game.waste[game.waste.length - 1];
-                if (!card) return;
-                const idx = findFoundationIndex(game, card);
-                if (idx !== -1) handleFoundationClick(idx);
-              }}
-              disabled={!selectedCard}
-            >
-              Move to foundation
-            </button>
             <button type="button" onClick={handleUndo} disabled={gameHistory.length === 0 || resigned}>
               Undo
             </button>
