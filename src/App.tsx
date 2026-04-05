@@ -375,6 +375,10 @@ const App = (): JSX.Element => {
   // handleKeyRef updated every render (same pattern as executeDropRef)
   const handleKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
 
+  const [showRefreshModal, setShowRefreshModal] = useState(false);
+  // Tracks whether the page should prompt before unloading (always fresh via ref)
+  const shouldWarnBeforeUnloadRef = useRef(false);
+
   useEffect(() => {
     localStorage.setItem("solitaire-player", playerName);
   }, [playerName]);
@@ -531,14 +535,29 @@ const App = (): JSX.Element => {
     cancelDrag();
   };
 
+  // Keep the unload-warning flag fresh every render (no stale-closure risk)
+  shouldWarnBeforeUnloadRef.current =
+    !game.completed && !resigned && game.moves > 0 && screen === "game";
+
   // Updated every render — always reads fresh state and latest handler callbacks.
   handleKeyRef.current = (e: KeyboardEvent) => {
     // Never intercept while user is typing in an input/textarea
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-    const anyModalOpen =
-      showResignModal || showPlayAgainModal || showSettings || showAutoCompleteModal;
     const key = e.key;
+
+    // Intercept browser refresh shortcuts (F5, Ctrl/Cmd + R, Ctrl/Cmd + Shift + R)
+    const isRefreshShortcut =
+      key === "F5" ||
+      ((e.ctrlKey || e.metaKey) && (key === "r" || key === "R"));
+    if (isRefreshShortcut && shouldWarnBeforeUnloadRef.current) {
+      e.preventDefault();
+      setShowRefreshModal(true);
+      return;
+    }
+
+    const anyModalOpen =
+      showResignModal || showPlayAgainModal || showSettings || showAutoCompleteModal || showRefreshModal;
     const upper = key.toUpperCase();
 
     // Escape always clears selection + focus (works even when modals open)
@@ -699,13 +718,23 @@ const App = (): JSX.Element => {
 
     const onKeyDown = (e: KeyboardEvent) => handleKeyRef.current(e);
 
+    // Warn before tab/window close or toolbar-refresh (browser native dialog)
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (shouldWarnBeforeUnloadRef.current) {
+        e.preventDefault();
+        e.returnValue = ""; // Required for Chrome to show the dialog
+      }
+    };
+
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, []); // empty — stale closure avoided entirely via refs
 
@@ -725,6 +754,7 @@ const App = (): JSX.Element => {
     setShowRestartConfirm(false);
     setSelection(null);
     setKeyboardFocus(null);
+    setShowRefreshModal(false);
     setTimerKey((prev) => prev + 1);
     setStatusMessage("");
     setScreen("game");
@@ -976,6 +1006,33 @@ const App = (): JSX.Element => {
 
   return (
     <div className="app-shell">
+      {/* Refresh / new-game intercept modal */}
+      {showRefreshModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal">
+            <h2>Start a new game?</h2>
+            <p>
+              You have a game in progress with <strong>{game.score} pts</strong>. Starting a
+              new game will lose your current progress.
+            </p>
+            <div className="modal-buttons">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRefreshModal(false);
+                  handleRestart();
+                }}
+              >
+                New game
+              </button>
+              <button type="button" onClick={() => setShowRefreshModal(false)}>
+                Keep playing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Auto-complete modal */}
       {showAutoCompleteModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true">

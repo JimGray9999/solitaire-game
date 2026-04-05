@@ -848,10 +848,15 @@ body {
 
 /* ── Keyboard navigation highlight ─────────────────────────────────────────── */
 
+/* Inset shadow keeps the highlight inside the element's own border box so it
+   never covers adjacent cards in a stacked column. */
 .keyboard-focused {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
+  box-shadow: inset 0 0 0 3px var(--accent), inset 0 0 8px rgba(254, 205, 50, 0.25);
   border-radius: 4px;
-  position: relative;
-  z-index: 3;
+}
+
+/* For pile containers (stock, discard, foundation) the inset still works and
+   an extra glow on the outer edge makes them stand out against the dark table. */
+.pile.keyboard-focused {
+  box-shadow: inset 0 0 0 3px var(--accent), 0 0 10px rgba(254, 205, 50, 0.35);
 }
