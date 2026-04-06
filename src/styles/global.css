@@ -57,11 +57,17 @@ body {
 }
 
 .app-footer {
-  margin-top: auto; /* pushes footer to the bottom if content is short */
-  padding: 0.5rem 1rem;
-  text-align: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 0.5rem;
+}
+
+.app-footer a + a::before {
+  content: "|";
+  margin-right: 0.5rem;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  pointer-events: none;
 }
 
 /* left column: hud + banner + board */
