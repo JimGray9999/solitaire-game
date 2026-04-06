@@ -1461,6 +1461,15 @@ const App = (): JSX.Element => {
           )}
         </div>
       </div>
+      <footer className="app-footer">
+        <p>© {new Date().getFullYear()} Solitaire. Test project made along with Claude Code. 
+          AI can be a great help, but it's not a replacement for human intelligence.
+          AI can also make mistakes, so it's important to review the code carefully.
+          <a href="https://github.com/JimGray9999/solitaire-game">GitHub</a>
+          <a href="https://www.claude.com/code">Claude Code</a>
+          <a href="https://www.linkedin.com/in/jgray00/">LinkedIn</a>
+        </p>
+      </footer>
     </div>
   );
 };

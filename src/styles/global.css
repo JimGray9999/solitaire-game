@@ -56,6 +56,14 @@ body {
   align-items: start;
 }
 
+.app-footer {
+  margin-top: auto; /* pushes footer to the bottom if content is short */
+  padding: 0.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
 /* left column: hud + banner + board */
 .game-area {
   min-width: 0; /* prevent grid blowout */
