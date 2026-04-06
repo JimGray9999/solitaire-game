@@ -723,7 +723,7 @@ const App = (): JSX.Element => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (shouldWarnBeforeUnloadRef.current) {
         e.preventDefault();
-        e.returnValue = "You have a game in progress.";
+        e.returnValue = "Your game progress will be lost.";
       }
     };
 
