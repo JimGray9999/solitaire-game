@@ -718,11 +718,12 @@ const App = (): JSX.Element => {
 
     const onKeyDown = (e: KeyboardEvent) => handleKeyRef.current(e);
 
-    // Warn before tab/window close or toolbar-refresh (browser native dialog)
+    // Warn before tab/window close or toolbar-refresh (browser native dialog).
+    // returnValue must be a non-empty string — Chrome ignores falsy values.
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (shouldWarnBeforeUnloadRef.current) {
         e.preventDefault();
-        e.returnValue = ""; // Required for Chrome to show the dialog
+        e.returnValue = "You have a game in progress.";
       }
     };
 
@@ -1264,7 +1265,7 @@ const App = (): JSX.Element => {
           </div>
           <div className="controls">
             <button type="button" onClick={handleStockClick}>
-              {game.stock.length ? "Draw card" : "Reset stock"}
+              {game.stock.length ? "Draw" : "Reset stock"}
             </button>
             <button type="button" onClick={handleUndo} disabled={gameHistory.length === 0 || resigned}>
               Undo
@@ -1465,12 +1466,14 @@ const App = (): JSX.Element => {
         <p>© {new Date().getFullYear()} Solitaire. Test project made along with Claude Code. 
           AI can be a great help, but it's not a replacement for human intelligence.
           AI can also make mistakes, so it's important to review the code carefully.
-          <a href="https://github.com/JimGray9999/solitaire-game">GitHub</a>
+          </p>
+          <p>
+          <a href="https://github.com/JimGray9999/solitaire-game" target="_blank" rel="noopener noreferrer">GitHub</a>
           {" | "}
-          <a href="https://www.claude.com/code">Claude Code</a>
+          <a href="https://www.claude.com/code" target="_blank" rel="noopener noreferrer">Claude Code</a>
           {" | "}
-          <a href="https://www.linkedin.com/in/jgray00/">LinkedIn</a>
-        </p>
+          <a href="https://www.linkedin.com/in/jgray00/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          </p>
       </footer>
     </div>
   );
